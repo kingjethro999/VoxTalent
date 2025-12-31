@@ -45,6 +45,9 @@ export default function InterPrepInterviewPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recognitionRef = useRef<any>(null)
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const lastSpeechTimeRef = useRef<number>(0)
+  const currentAnswerRef = useRef<string>("")
 
   // Load data from localStorage
   useEffect(() => {
@@ -82,10 +85,10 @@ export default function InterPrepInterviewPage() {
 
       setQuestions(result.questions)
       setState("ready")
-      // Auto-start first question
+      // Auto-start first question after a brief delay
       setTimeout(() => {
         askQuestion(result.questions[0])
-      }, 500)
+      }, 1000)
     } catch (err) {
       console.error("Error generating questions:", err)
       setError(err as Error)
@@ -99,8 +102,20 @@ export default function InterPrepInterviewPage() {
     setCurrentAnalysis(null)
     setIsListening(false)
 
+    // Stop any existing audio
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+
+    // Stop any existing recognition
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+      recognitionRef.current = null
+    }
+
     try {
-      // Get TTS audio
+      // Get TTS audio - use ONLY the question text, no introduction
       const response = await fetch("/api/elevenlabs/text-to-speech", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -114,16 +129,32 @@ export default function InterPrepInterviewPage() {
 
       // Play audio
       const audio = new Audio(`data:audio/mp3;base64,${result.audio}`)
+      
+      // Clean up previous audio
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.src = ""
+      }
+      
       audioRef.current = audio
       
       audio.onplay = () => setIsPlaying(true)
       audio.onended = () => {
         setIsPlaying(false)
-        // Start listening after question is asked
-        startListening()
+        // Wait 5-8 seconds, then auto-start listening
+        const delay = 5000 + Math.random() * 3000 // 5-8 seconds
+        setTimeout(() => {
+          startListening()
+        }, delay)
       }
       
-      audio.play()
+      audio.onerror = (err) => {
+        console.error("Audio playback error:", err)
+        setIsPlaying(false)
+        setState("ready")
+      }
+      
+      await audio.play()
     } catch (err) {
       console.error("Error asking question:", err)
       setError(err as Error)
@@ -131,40 +162,148 @@ export default function InterPrepInterviewPage() {
     }
   }
 
-  const startListening = () => {
+  const startListening = async () => {
+    // Stop any existing recognition first
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+      recognitionRef.current = null
+    }
+
+    // Clear any existing silence timer
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
+
     if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-      alert("Speech recognition not supported in this browser")
+      alert("Speech recognition not supported in this browser. Please use Chrome or Edge.")
+      return
+    }
+
+    // Request microphone permission
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (err) {
+      alert("Microphone permission denied. Please allow microphone access and try again.")
       return
     }
 
     setState("listening")
     setIsListening(true)
+    lastSpeechTimeRef.current = Date.now()
 
     const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition
     const recognition = new SpeechRecognition()
     recognition.continuous = true
     recognition.interimResults = true
+    recognition.lang = "en-US"
+
+    let finalTranscript = ""
 
     recognition.onresult = (event: any) => {
-      let transcript = ""
+      let interimTranscript = ""
+      finalTranscript = ""
+
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript
+        const transcript = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + " "
+        } else {
+          interimTranscript += transcript
+        }
       }
-      setCurrentAnswer(transcript)
+
+      // Update with both final and interim results
+      const fullTranscript = finalTranscript + interimTranscript
+      setCurrentAnswer(fullTranscript)
+      currentAnswerRef.current = fullTranscript
+      
+      // Reset silence timer whenever we get speech
+      lastSpeechTimeRef.current = Date.now()
+      
+      // Clear existing timer
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current)
+        silenceTimerRef.current = null
+      }
+      
+      // If we have a final transcript (user finished speaking), wait for silence
+      if (finalTranscript.trim().length > 0) {
+        // Wait 3 seconds of silence after final speech, then auto-submit
+        silenceTimerRef.current = setTimeout(() => {
+          // Check if we're still listening and have an answer
+          const answerToSubmit = currentAnswerRef.current.trim()
+          if (answerToSubmit.length > 0 && isListening && recognitionRef.current) {
+            console.log("[Interview] Auto-submitting after 3 seconds of silence")
+            // Stop recognition first
+            recognitionRef.current.stop()
+            recognitionRef.current = null
+            setIsListening(false)
+            // Ensure answer is set, then submit
+            setCurrentAnswer(answerToSubmit)
+            setTimeout(() => {
+              submitAnswer()
+            }, 200)
+          }
+        }, 3000)
+      }
     }
 
     recognition.onend = () => {
-      setIsListening(false)
+      // Only restart if we're still in listening state and haven't submitted
+      if (isListening && state === "listening" && currentAnswer.trim().length === 0) {
+        // Restart recognition if it ended unexpectedly (no answer yet)
+        try {
+          recognition.start()
+        } catch (err) {
+          console.log("Recognition already started or stopped")
+          setIsListening(false)
+          setState("ready")
+        }
+      } else {
+        setIsListening(false)
+        if (state === "listening") {
+          setState("ready")
+        }
+      }
     }
 
     recognition.onerror = (event: any) => {
       console.error("Speech recognition error:", event.error)
-      setIsListening(false)
-      setState("ready")
+      
+      // Don't restart on certain errors
+      if (event.error === "no-speech") {
+        // If no speech after 10 seconds, might want to restart or show message
+        setIsListening(false)
+        setState("ready")
+        recognitionRef.current = null
+      } else if (event.error === "aborted") {
+        // User or system stopped it
+        setIsListening(false)
+        setState("ready")
+        recognitionRef.current = null
+      } else if (event.error === "not-allowed") {
+        alert("Microphone permission denied. Please allow microphone access.")
+        setIsListening(false)
+        setState("ready")
+        recognitionRef.current = null
+      } else {
+        // For other errors, try to continue
+        setIsListening(false)
+        setState("ready")
+        recognitionRef.current = null
+      }
     }
 
     recognitionRef.current = recognition
-    recognition.start()
+    
+    try {
+      recognition.start()
+    } catch (err) {
+      console.error("Failed to start recognition:", err)
+      setIsListening(false)
+      setState("ready")
+    }
   }
 
   const stopListening = () => {
@@ -172,12 +311,19 @@ export default function InterPrepInterviewPage() {
       recognitionRef.current.stop()
       recognitionRef.current = null
     }
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
     setIsListening(false)
     setState("ready")
   }
 
   const submitAnswer = async () => {
     if (!currentAnswer.trim()) return
+
+    // Stop listening and clear timers
+    stopListening()
 
     const currentQuestion = questions[currentQuestionIndex]
     setState("analyzing")
@@ -341,52 +487,43 @@ export default function InterPrepInterviewPage() {
 
           {/* Audio Controls */}
           {state === "asking" && isPlaying && (
-            <div className="flex items-center gap-4 text-white/60">
+            <div className="flex items-center gap-4 text-white/60 mb-4">
               <Pause className="h-5 w-5" />
               <span>Asking question...</span>
             </div>
           )}
-
-          {/* Answer Input */}
-          {state === "ready" || state === "listening" ? (
-            <div className="space-y-4">
-              <textarea
-                value={currentAnswer}
-                onChange={(e) => setCurrentAnswer(e.target.value)}
-                placeholder="Type your answer or use voice input..."
-                className="w-full p-4 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 resize-none"
-                rows={6}
-              />
-              
-              <div className="flex items-center gap-4">
-                {!isListening ? (
-                  <button
-                    onClick={startListening}
-                    className="flex items-center gap-2 px-6 py-3 bg-white text-black rounded-lg font-semibold hover:bg-white/90 transition-colors"
-                  >
-                    <Mic className="h-5 w-5" />
-                    Start Voice Input
-                  </button>
-                ) : (
-                  <button
-                    onClick={stopListening}
-                    className="flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors"
-                  >
-                    <MicOff className="h-5 w-5" />
-                    Stop Recording
-                  </button>
-                )}
-                
-                <button
-                  onClick={submitAnswer}
-                  disabled={!currentAnswer.trim() || state === "analyzing"}
-                  className="px-6 py-3 bg-white text-black rounded-lg font-semibold hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {state === "analyzing" ? "Analyzing..." : "Submit Answer"}
-                </button>
+          
+          {state === "listening" && (
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex items-center gap-2 text-green-400">
+                <Mic className="h-5 w-5 animate-pulse" />
+                <span className="text-sm font-semibold">Listening... Speak your answer</span>
               </div>
             </div>
-          ) : null}
+          )}
+
+          {/* Answer Display (Read-only, voice-only input) */}
+          {(state === "ready" || state === "listening") && (
+            <div className="space-y-4">
+              <div className="w-full p-4 bg-white/5 border border-white/10 rounded-lg text-white min-h-[150px]">
+                {currentAnswer ? (
+                  <p className="text-white whitespace-pre-wrap">{currentAnswer}</p>
+                ) : (
+                  <p className="text-white/40 italic">
+                    {state === "listening" 
+                      ? "Listening for your answer..." 
+                      : "Waiting for question to finish..."}
+                  </p>
+                )}
+              </div>
+              
+              {state === "listening" && currentAnswer.trim() && (
+                <div className="text-xs text-white/50">
+                  Speak naturally. Your answer will be submitted automatically after a few seconds of silence.
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Analysis Display */}
           {currentAnalysis && (

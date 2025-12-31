@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useRouter } from "next/navigation"
 import { useState, useRef } from "react"
-import { Upload } from "lucide-react"
+import { Upload, Link as LinkIcon } from "lucide-react"
 
 export default function InterPrepHome() {
   const router = useRouter()
@@ -14,6 +14,9 @@ export default function InterPrepHome() {
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isParsing, setIsParsing] = useState(false)
+  const [useLinkParsing, setUseLinkParsing] = useState(false)
+  const [jobLink, setJobLink] = useState("")
+  const [isFetchingLink, setIsFetchingLink] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,6 +76,34 @@ export default function InterPrepHome() {
       setResumeFile(null)
       setResume("")
       setIsParsing(false)
+    }
+  }
+
+  const handleFetchJobLink = async () => {
+    if (!jobLink.trim()) return
+
+    setIsFetchingLink(true)
+    try {
+      const response = await fetch("/api/parse-job-link", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: jobLink }),
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to fetch job description")
+      }
+
+      setJobDescription(result.text)
+      setIsFetchingLink(false)
+    } catch (error) {
+      console.error("Error fetching job link:", error)
+      alert(error instanceof Error ? error.message : "Failed to fetch job description from link")
+      setIsFetchingLink(false)
     }
   }
 
@@ -223,37 +254,150 @@ export default function InterPrepHome() {
         </div>
 
         <div style={{ textAlign: "left" }}>
-          <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "rgba(255, 255, 255, 0.7)" }}>
-            Job Description
-          </label>
-          <textarea
-            value={jobDescription}
-            onChange={(e) => setJobDescription(e.target.value)}
-            placeholder="Paste the job description here..."
-            style={{
-              marginTop: "8px",
-              padding: "12px 16px",
-              borderRadius: "10px",
-              background: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              color: "white",
-              fontSize: "0.9rem",
-              fontFamily: "Inter, sans-serif",
-              width: "100%",
-              boxSizing: "border-box",
-              minHeight: "100px",
-              resize: "none",
-              transition: "all 0.3s",
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = "#8E75FF"
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)"
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"
-            }}
-          />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+            <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "rgba(255, 255, 255, 0.7)" }}>
+              Job Description
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "0.75rem",
+                color: "rgba(100, 149, 237, 0.8)",
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={useLinkParsing}
+                onChange={(e) => {
+                  setUseLinkParsing(e.target.checked)
+                  if (!e.target.checked) {
+                    setJobLink("")
+                  }
+                }}
+                style={{ cursor: "pointer", accentColor: "#6495ED" }}
+              />
+              <LinkIcon className="h-3 w-3" />
+              <span>Parse from link</span>
+            </label>
+          </div>
+
+          {useLinkParsing ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  type="url"
+                  value={jobLink}
+                  onChange={(e) => setJobLink(e.target.value)}
+                  placeholder="Paste job posting URL..."
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !isFetchingLink) {
+                      e.preventDefault()
+                      handleFetchJobLink()
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "12px 16px",
+                    borderRadius: "10px",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    color: "white",
+                    fontSize: "0.9rem",
+                    fontFamily: "Inter, sans-serif",
+                    boxSizing: "border-box",
+                    transition: "all 0.3s",
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "#6495ED"
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)"
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleFetchJobLink}
+                  disabled={isFetchingLink || !jobLink.trim()}
+                  style={{
+                    padding: "12px 20px",
+                    borderRadius: "10px",
+                    background: isFetchingLink || !jobLink.trim() ? "rgba(100, 149, 237, 0.3)" : "#6495ED",
+                    color: "white",
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    border: "none",
+                    cursor: isFetchingLink || !jobLink.trim() ? "not-allowed" : "pointer",
+                    transition: "all 0.3s",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {isFetchingLink ? "Fetching..." : "Fetch"}
+                </button>
+              </div>
+              <textarea
+                value={jobDescription}
+                onChange={(e) => setJobDescription(e.target.value)}
+                placeholder="Job description will appear here after fetching..."
+                style={{
+                  padding: "12px 16px",
+                  borderRadius: "10px",
+                  background: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  color: "white",
+                  fontSize: "0.9rem",
+                  fontFamily: "Inter, sans-serif",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  minHeight: "100px",
+                  resize: "none",
+                  transition: "all 0.3s",
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = "#8E75FF"
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)"
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"
+                }}
+              />
+            </div>
+          ) : (
+            <textarea
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+              placeholder="Paste the job description here..."
+              style={{
+                marginTop: "8px",
+                padding: "12px 16px",
+                borderRadius: "10px",
+                background: "rgba(255, 255, 255, 0.05)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                color: "white",
+                fontSize: "0.9rem",
+                fontFamily: "Inter, sans-serif",
+                width: "100%",
+                boxSizing: "border-box",
+                minHeight: "100px",
+                resize: "none",
+                transition: "all 0.3s",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "#8E75FF"
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)"
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"
+              }}
+            />
+          )}
         </div>
 
         <button
