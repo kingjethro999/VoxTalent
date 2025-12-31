@@ -1,0 +1,253 @@
+================================================================================
+ELEVENLABS POST-CALL WEBHOOK SETUP GUIDE
+================================================================================
+
+This guide will help you configure ElevenLabs post-call webhooks to receive
+transcript data automatically when voice conversations end.
+
+================================================================================
+STEP 1: GET YOUR WEBHOOK SECRET
+================================================================================
+
+1. Go to ElevenLabs Agents Platform Settings:
+   https://elevenlabs.io/app/agents/settings
+
+2. Navigate to the "Webhooks" section
+
+3. Click "Add Webhook" or "Configure Webhook"
+
+4. You will be provided with a Webhook Secret - COPY THIS SECRET
+   (It will look like: whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)
+
+5. Save this secret securely - you'll need it for Step 3
+
+================================================================================
+STEP 2: CONFIGURE WEBHOOK URL
+================================================================================
+
+Your webhook endpoint is located at:
+  /api/elevenlabs-webhook
+
+For PRODUCTION:
+  Webhook URL: https://yourdomain.com/api/elevenlabs-webhook
+  (Replace 'yourdomain.com' with your actual domain)
+
+For LOCAL DEVELOPMENT:
+  You need to expose your local server using a tunneling service:
+
+  Option A: Using ngrok (Recommended)
+  1. Install ngrok: https://ngrok.com/download
+  2. Start your Next.js dev server: npm run dev (or pnpm dev)
+  3. In a new terminal, run: ngrok http 3000
+  4. Copy the HTTPS URL (e.g., https://abc123.ngrok.io)
+  5. Use: https://abc123.ngrok.io/api/elevenlabs-webhook
+
+  Option B: Using Cloudflare Tunnel
+  1. Install cloudflared: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/
+  2. Run: cloudflared tunnel --url http://localhost:3000
+  3. Use the provided HTTPS URL + /api/elevenlabs-webhook
+
+================================================================================
+STEP 3: ADD WEBHOOK SECRET TO ENVIRONMENT VARIABLES
+================================================================================
+
+1. Open your .env.local file (create it if it doesn't exist)
+
+2. Add the following line:
+   ELEVENLABS_CONVAI_WEBHOOK_SECRET=your_webhook_secret_here
+
+3. Replace 'your_webhook_secret_here' with the secret you copied in Step 1
+
+4. Save the file
+
+5. Restart your development server:
+   - Stop the current server (Ctrl+C)
+   - Run: npm run dev (or pnpm dev)
+
+================================================================================
+STEP 4: ENABLE WEBHOOK IN ELEVENLABS
+================================================================================
+
+1. Go back to: https://elevenlabs.io/app/agents/settings
+
+2. In the Webhooks section, click "Add Webhook" or edit existing webhook
+
+3. Enter your Webhook URL (from Step 2)
+
+4. Select the webhook type: "Post-call Transcription"
+   - This will send full conversation transcripts after calls end
+
+5. (Optional) Enable "Post-call Audio" if you want audio files
+   - Note: Audio webhooks can be large files
+
+6. Save the webhook configuration
+
+================================================================================
+STEP 5: TEST THE WEBHOOK
+================================================================================
+
+1. Make a test call using your ResumeBuddy or InterPrep agent
+
+2. Complete the conversation
+
+3. Check your server logs for:
+   [Webhook] Received post_call_transcription event
+   [Webhook] Conversation ID: abc123...
+   [Webhook] Transcript stored for conversation: abc123...
+
+4. The webhook should arrive within a few seconds after the call ends
+
+5. If you see errors, check:
+   - Webhook URL is correct and accessible
+   - ELEVENLABS_CONVAI_WEBHOOK_SECRET is set correctly
+   - Your server is running and accessible
+
+================================================================================
+WEBHOOK SECURITY
+================================================================================
+
+The webhook endpoint validates all incoming requests using HMAC signatures:
+
+1. ElevenLabs signs each webhook request with your secret
+2. The endpoint verifies the signature before processing
+3. Invalid or expired requests are rejected (401 status)
+
+Security Features:
+- HMAC SHA-256 signature validation
+- Timestamp validation (30-minute tolerance)
+- Automatic rejection of invalid requests
+
+For additional security, you can whitelist ElevenLabs IP addresses:
+
+US (Default):
+  34.67.146.145
+  34.59.11.47
+
+EU:
+  35.204.38.71
+  34.147.113.54
+
+Asia:
+  35.185.187.110
+  35.247.157.189
+
+================================================================================
+WEBHOOK DATA STRUCTURE
+================================================================================
+
+The webhook receives the following data structure:
+
+{
+  "type": "post_call_transcription",
+  "event_timestamp": 1739537297,
+  "data": {
+    "agent_id": "agent_xxx",
+    "conversation_id": "conv_xxx",
+    "status": "done",
+    "transcript": [
+      {
+        "role": "agent" | "user",
+        "message": "Full text of the message",
+        "time_in_call_secs": 0
+      }
+    ],
+    "analysis": {
+      "transcript_summary": "Summary of the conversation",
+      "call_successful": "success"
+    },
+    "metadata": {
+      "start_time_unix_secs": 1739537297,
+      "call_duration_secs": 22,
+      "cost": 296
+    }
+  }
+}
+
+The system automatically:
+1. Extracts the full transcript from all messages
+2. Stores it by conversation_id
+3. Makes it available for polling by the frontend
+4. Sends it to Gemini for processing (ResumeBuddy or InterPrep)
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Problem: Webhook not receiving data
+Solution:
+  - Verify webhook URL is accessible (test with curl or Postman)
+  - Check that ELEVENLABS_CONVAI_WEBHOOK_SECRET is set
+  - Verify webhook is enabled in ElevenLabs settings
+  - Check server logs for errors
+
+Problem: "Invalid signature" error
+Solution:
+  - Verify ELEVENLABS_CONVAI_WEBHOOK_SECRET matches the secret in ElevenLabs
+  - Ensure the secret doesn't have extra spaces or quotes
+  - Restart your server after updating the secret
+
+Problem: "Request expired" error
+Solution:
+  - This is normal for old webhook deliveries
+  - The system has a 30-minute tolerance window
+  - If you're testing, make sure your server clock is synchronized
+
+Problem: Webhook works but transcript not appearing
+Solution:
+  - Check that the frontend is polling correctly
+  - Verify conversation_id is being tracked
+  - Check browser console for polling errors
+  - The system falls back to live transcript if webhook doesn't arrive
+
+================================================================================
+PRODUCTION DEPLOYMENT
+================================================================================
+
+For production deployment:
+
+1. Set ELEVENLABS_CONVAI_WEBHOOK_SECRET in your hosting platform:
+   - Vercel: Project Settings > Environment Variables
+   - Netlify: Site Settings > Environment Variables
+   - Railway/Render: Environment Variables section
+
+2. Update webhook URL in ElevenLabs to your production domain:
+   https://yourdomain.com/api/elevenlabs-webhook
+
+3. Test the webhook in production:
+   - Make a test call
+   - Verify webhook is received
+   - Check that transcript processing works
+
+4. Monitor webhook delivery:
+   - Check server logs regularly
+   - Set up error monitoring (e.g., Sentry)
+   - ElevenLabs will auto-disable webhooks after 10 consecutive failures
+
+================================================================================
+ADDITIONAL RESOURCES
+================================================================================
+
+ElevenLabs Webhook Documentation:
+https://elevenlabs.io/docs/overview/administration/webhooks
+
+ElevenLabs Agents Platform:
+https://elevenlabs.io/app/agents/settings
+
+Webhook Testing Tools:
+- ngrok: https://ngrok.com/
+- Cloudflare Tunnel: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
+
+================================================================================
+SUPPORT
+================================================================================
+
+If you encounter issues:
+
+1. Check server logs for detailed error messages
+2. Verify all environment variables are set correctly
+3. Test webhook endpoint manually with a tool like Postman
+4. Check ElevenLabs dashboard for webhook delivery status
+5. Review the webhook payload structure in server logs
+
+================================================================================
+
