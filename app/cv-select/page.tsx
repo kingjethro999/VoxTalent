@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 
@@ -56,7 +56,7 @@ const cvTemplates: CVTemplate[] = [
   },
 ];
 
-export default function CVSelect() {
+function CVSelectContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -108,21 +108,19 @@ export default function CVSelect() {
 
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplate(templateId);
-    // Move to stage 2 after selecting template
-    setTimeout(() => {
-      setStage('2');
-    }, 100);
+    // Navigate directly to view the CV
+    router.push(`/view/${templateId}`);
   };
 
   const handleNext = () => {
     if (selectedTemplate) {
-      setStage('2');
+      router.push(`/view/${selectedTemplate}`);
     }
   };
 
   const handleStart = () => {
-    if (selectedTemplate && selectedVoice) {
-      router.push(`/ai?template=${selectedTemplate}&voice=${selectedVoice}`);
+    if (selectedTemplate) {
+      router.push(`/view/${selectedTemplate}`);
     }
   };
 
@@ -360,105 +358,59 @@ export default function CVSelect() {
 
       <div className="container">
         <div className="header">
-          <h1>
-            {stage === '1' ? 'Select Your Template' : 'Choose Your Voice'}
-          </h1>
-          <p>
-            {stage === '1' 
-              ? 'Choose a resume design that matches your style' 
-              : 'Select a voice for your conversation experience'}
-          </p>
+          <h1>Select Your Template</h1>
+          <p>Choose a resume design that matches your style</p>
         </div>
 
-        {/* Stage Indicator */}
-        <div className="stage-indicator">
-          <div className={`stage-item ${stage === '1' ? 'active' : ''}`}>
-            <div className="stage-number">1</div>
-            <span>Select Template</span>
-          </div>
-          <div className={`stage-item ${stage === '2' ? 'active' : ''}`}>
-            <div className="stage-number">2</div>
-            <span>Select Voice</span>
-          </div>
+        {/* Template Selection */}
+        <div className="templates-grid">
+          {cvTemplates.map((template) => (
+            <div
+              key={template.id}
+              className={`template-card ${selectedTemplate === template.id ? 'selected' : ''}`}
+              onClick={() => handleTemplateSelect(template.id)}
+            >
+              <Image
+                src={template.image}
+                alt={template.name}
+                width={250}
+                height={300}
+                className="template-image"
+              />
+              <div className="template-name">{template.name}</div>
+            </div>
+          ))}
         </div>
 
-        {/* Stage 1: Template Selection */}
-        {stage === '1' && (
-          <>
-            <div className="templates-grid">
-              {cvTemplates.map((template) => (
-                <div
-                  key={template.id}
-                  className={`template-card ${selectedTemplate === template.id ? 'selected' : ''}`}
-                  onClick={() => handleTemplateSelect(template.id)}
-                >
-                  <Image
-                    src={template.image}
-                    alt={template.name}
-                    width={250}
-                    height={300}
-                    className="template-image"
-                  />
-                  <div className="template-name">{template.name}</div>
-                </div>
-              ))}
-            </div>
-
-            <button
-              className="action-btn"
-              onClick={handleNext}
-              disabled={!selectedTemplate}
-            >
-              Next
-            </button>
-          </>
-        )}
-
-        {/* Stage 2: Voice Selection */}
-        {stage === '2' && (
-          <>
-            {selectedTemplate && (
-              <div className="selected-template-info">
-                <h3>Selected Template</h3>
-                <p>
-                  {cvTemplates.find(t => t.id === selectedTemplate)?.name || selectedTemplate}
-                </p>
-              </div>
-            )}
-
-            <div className="voice-selection">
-              <h2>Choose Your Voice</h2>
-              <p>Select a voice for your conversation experience</p>
-              <div className="voice-options">
-                <div
-                  className={`voice-option ${selectedVoice === 'male' ? 'selected' : ''}`}
-                  onClick={() => setSelectedVoice('male')}
-                >
-                  <div className="voice-icon">♂</div>
-                  <div className="voice-label">Male Voice</div>
-                  <div className="voice-name">Finn</div>
-                </div>
-                <div
-                  className={`voice-option ${selectedVoice === 'female' ? 'selected' : ''}`}
-                  onClick={() => setSelectedVoice('female')}
-                >
-                  <div className="voice-icon">♀</div>
-                  <div className="voice-label">Female Voice</div>
-                  <div className="voice-name">Alexis</div>
-                </div>
-              </div>
-            </div>
-
-            <button
-              className="action-btn"
-              onClick={handleStart}
-              disabled={!selectedTemplate || !selectedVoice}
-            >
-              Start with {selectedVoice === 'male' ? 'Finn' : selectedVoice === 'female' ? 'Alexis' : 'Voice'}
-            </button>
-          </>
+        {selectedTemplate && (
+          <button
+            className="action-btn"
+            onClick={handleNext}
+          >
+            View Resume
+          </button>
         )}
       </div>
     </>
+  );
+}
+
+export default function CVSelect() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        width: '100vw',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#0a0a0c',
+        color: 'white'
+      }}>
+        <div>Loading...</div>
+      </div>
+    }>
+      <CVSelectContent />
+    </Suspense>
   );
 }

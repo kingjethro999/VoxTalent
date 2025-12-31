@@ -6,7 +6,7 @@ export default function ResumeBuddyHome() {
   const router = useRouter()
 
   const handleStartCrafting = () => {
-    router.push("/ai?mode=resumebuddy")
+    router.push("/resumebuddy-interview")
   }
 
   return (

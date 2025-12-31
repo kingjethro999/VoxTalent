@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
-import pdfParse from "pdf-parse"
 import mammoth from "mammoth"
+
+// Type declaration for pdf-parse CommonJS module
+declare function require(module: string): any
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,6 +24,8 @@ export async function POST(request: NextRequest) {
     // Handle PDF files
     if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
       try {
+        // Use require for CommonJS module compatibility
+        const pdfParse = require("pdf-parse")
         const arrayBuffer = await file.arrayBuffer()
         const buffer = Buffer.from(arrayBuffer)
         const pdfData = await pdfParse(buffer)

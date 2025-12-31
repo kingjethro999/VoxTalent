@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { CVData, cvData as defaultCvData } from '@/data/data';
+import { CVData, cvData as defaultCvData } from '@/lib/data';
 
 // Import template components directly
 import BalancedCV from '@/app/view/balanced-cv/page';
