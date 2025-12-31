@@ -156,7 +156,7 @@ export default function InterPrepHome() {
           InterPrep
         </h1>
         <p style={{ fontSize: "1.1rem", color: "rgba(255, 255, 255, 0.5)", margin: 0 }}>
-          Master your interview with high-stakes simulation. Get brutally honest AI feedback.
+          Master your interview with high-stakes simview/balanced-cvulation. Get brutally honest AI feedback.
         </p>
       </div>
 
@@ -369,34 +369,34 @@ export default function InterPrepHome() {
               />
             </div>
           ) : (
-            <textarea
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              placeholder="Paste the job description here..."
-              style={{
-                marginTop: "8px",
-                padding: "12px 16px",
-                borderRadius: "10px",
-                background: "rgba(255, 255, 255, 0.05)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                color: "white",
-                fontSize: "0.9rem",
-                fontFamily: "Inter, sans-serif",
-                width: "100%",
-                boxSizing: "border-box",
-                minHeight: "100px",
-                resize: "none",
-                transition: "all 0.3s",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "#8E75FF"
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)"
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"
-              }}
-            />
+          <textarea
+            value={jobDescription}
+            onChange={(e) => setJobDescription(e.target.value)}
+            placeholder="Paste the job description here..."
+            style={{
+              marginTop: "8px",
+              padding: "12px 16px",
+              borderRadius: "10px",
+              background: "rgba(255, 255, 255, 0.05)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              color: "white",
+              fontSize: "0.9rem",
+              fontFamily: "Inter, sans-serif",
+              width: "100%",
+              boxSizing: "border-box",
+              minHeight: "100px",
+              resize: "none",
+              transition: "all 0.3s",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "#8E75FF"
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)"
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"
+            }}
+          />
           )}
         </div>
 

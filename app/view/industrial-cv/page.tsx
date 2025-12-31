@@ -209,7 +209,7 @@ export default function IndustrialCV() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-gray-200 py-8 px-4">
+    <div className="min-h-screen bg-gray-200 py-8 px-4">
         {/* Floating Action Button */}
         <div className="fab-container">
           <div className="fab-group">
@@ -240,8 +240,8 @@ export default function IndustrialCV() {
         </div>
 
         <div ref={resumeRef} className="max-w-4xl mx-auto bg-white border-4 border-gray-800">
-          {/* Industrial Header */}
-          <header className="bg-gray-800 text-white p-6 border-b-4 border-gray-600">
+        {/* Industrial Header */}
+        <header className="bg-gray-800 text-white p-6 border-b-4 border-gray-600">
             <EditableText
               tag="h1"
               text={cvData.personalInfo.name.toUpperCase()}
@@ -254,47 +254,47 @@ export default function IndustrialCV() {
               isEditing={isEditing}
               className="text-xl text-gray-300 uppercase tracking-wide mb-4"
             />
-            <div className="flex flex-wrap gap-4 text-sm border-t border-gray-600 pt-4">
-              <span className="bg-gray-700 px-3 py-1 rounded">
+          <div className="flex flex-wrap gap-4 text-sm border-t border-gray-600 pt-4">
+            <span className="bg-gray-700 px-3 py-1 rounded">
                 <EditableText tag="span" text={cvData.personalInfo.email} isEditing={isEditing} />
-              </span>
-              <span className="bg-gray-700 px-3 py-1 rounded">
+            </span>
+            <span className="bg-gray-700 px-3 py-1 rounded">
                 <EditableText tag="span" text={cvData.personalInfo.phone} isEditing={isEditing} />
-              </span>
-              <span className="bg-gray-700 px-3 py-1 rounded">
+            </span>
+            <span className="bg-gray-700 px-3 py-1 rounded">
                 <EditableText 
                   tag="span" 
                   text={`${cvData.personalInfo.address}, ${cvData.personalInfo.city}, ${cvData.personalInfo.country}`} 
                   isEditing={isEditing} 
                 />
-              </span>
-            </div>
-          </header>
+            </span>
+          </div>
+        </header>
 
-          <div className="p-6">
-            {/* Summary */}
-            <section className="mb-6 border-2 border-gray-300 p-4 bg-gray-50">
-              <h2 className="text-xl font-bold uppercase text-gray-900 mb-3 border-b-2 border-gray-800 pb-2">
-                Professional Summary
-              </h2>
+        <div className="p-6">
+          {/* Summary */}
+          <section className="mb-6 border-2 border-gray-300 p-4 bg-gray-50">
+            <h2 className="text-xl font-bold uppercase text-gray-900 mb-3 border-b-2 border-gray-800 pb-2">
+              Professional Summary
+            </h2>
               <EditableText
                 tag="p"
                 text={cvData.profile}
                 isEditing={isEditing}
                 className="text-gray-700 leading-relaxed"
               />
-            </section>
+          </section>
 
-            {/* Experience */}
-            <section className="mb-6">
-              <h2 className="text-xl font-bold uppercase text-gray-900 mb-4 border-b-2 border-gray-800 pb-2">
-                Professional Experience
-              </h2>
-              <div className="space-y-5">
-                {cvData.experience.map((exp, idx) => (
-                  <div key={idx} className="border-l-4 border-gray-800 pl-4 bg-gray-50 p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
+          {/* Experience */}
+          <section className="mb-6">
+            <h2 className="text-xl font-bold uppercase text-gray-900 mb-4 border-b-2 border-gray-800 pb-2">
+              Professional Experience
+            </h2>
+            <div className="space-y-5">
+              {cvData.experience.map((exp, idx) => (
+                <div key={idx} className="border-l-4 border-gray-800 pl-4 bg-gray-50 p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
                         <EditableText
                           tag="h3"
                           text={exp.position.toUpperCase()}
@@ -313,38 +313,38 @@ export default function IndustrialCV() {
                           isEditing={isEditing}
                           className="text-gray-600 text-sm"
                         />
-                      </div>
-                      <div className="text-right">
-                        <span className="bg-gray-800 text-white px-3 py-1 text-sm font-bold">
+                    </div>
+                    <div className="text-right">
+                      <span className="bg-gray-800 text-white px-3 py-1 text-sm font-bold">
                           <EditableText
                             tag="span"
                             text={`${exp.startDate} - ${exp.endDate}`}
                             isEditing={isEditing}
                           />
-                        </span>
-                      </div>
+                      </span>
                     </div>
-                    <ul className="list-disc list-inside text-gray-700 space-y-1 mt-2">
-                      {exp.description.map((item, i) => (
+                  </div>
+                  <ul className="list-disc list-inside text-gray-700 space-y-1 mt-2">
+                    {exp.description.map((item, i) => (
                         <li key={i}>
                           <EditableText tag="span" text={item} isEditing={isEditing} />
                         </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </section>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
 
-            {/* Two Column Layout */}
-            <div className="grid grid-cols-2 gap-6">
-              {/* Education */}
-              <section className="border-2 border-gray-300 p-4 bg-gray-50">
-                <h2 className="text-xl font-bold uppercase text-gray-900 mb-3 border-b-2 border-gray-800 pb-2">
-                  Education
-                </h2>
-                {cvData.education.map((edu, idx) => (
-                  <div key={idx} className="mb-4">
+          {/* Two Column Layout */}
+          <div className="grid grid-cols-2 gap-6">
+            {/* Education */}
+            <section className="border-2 border-gray-300 p-4 bg-gray-50">
+              <h2 className="text-xl font-bold uppercase text-gray-900 mb-3 border-b-2 border-gray-800 pb-2">
+                Education
+              </h2>
+              {cvData.education.map((edu, idx) => (
+                <div key={idx} className="mb-4">
                     <EditableText
                       tag="h3"
                       text={`${edu.degree}, ${edu.institution}`}
@@ -363,25 +363,25 @@ export default function IndustrialCV() {
                       isEditing={isEditing}
                       className="text-gray-600 text-sm"
                     />
-                  </div>
-                ))}
-              </section>
-
-              {/* Skills */}
-              <section className="border-2 border-gray-300 p-4 bg-gray-50">
-                <h2 className="text-xl font-bold uppercase text-gray-900 mb-3 border-b-2 border-gray-800 pb-2">
-                  Skills
-                </h2>
-                <div className="space-y-3">
-                  {cvData.skills.map((skill, idx) => (
-                    <SkillBar key={idx} label={skill.label} level={skill.level} isEditing={isEditing} />
-                  ))}
                 </div>
-              </section>
-            </div>
+              ))}
+            </section>
+
+            {/* Skills */}
+            <section className="border-2 border-gray-300 p-4 bg-gray-50">
+              <h2 className="text-xl font-bold uppercase text-gray-900 mb-3 border-b-2 border-gray-800 pb-2">
+                Skills
+              </h2>
+              <div className="space-y-3">
+                {cvData.skills.map((skill, idx) => (
+                    <SkillBar key={idx} label={skill.label} level={skill.level} isEditing={isEditing} />
+                ))}
+              </div>
+            </section>
           </div>
         </div>
       </div>
+    </div>
     </>
   );
 }
