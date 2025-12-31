@@ -209,7 +209,7 @@ export default function ElegantCV() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-amber-50 py-12 px-4">
+    <div className="min-h-screen bg-amber-50 py-12 px-4">
         {/* Floating Action Button */}
         <div className="fab-container">
           <div className="fab-group">
@@ -240,8 +240,8 @@ export default function ElegantCV() {
         </div>
 
         <div ref={resumeRef} className="max-w-4xl mx-auto bg-white shadow-2xl">
-          {/* Elegant Header */}
-          <header className="bg-gradient-to-b from-amber-100 to-white p-10 border-b-4 border-amber-800">
+        {/* Elegant Header */}
+        <header className="bg-gradient-to-b from-amber-100 to-white p-10 border-b-4 border-amber-800">
             <EditableText
               tag="h1"
               text={cvData.personalInfo.name}
@@ -254,11 +254,11 @@ export default function ElegantCV() {
               isEditing={isEditing}
               className="text-2xl text-amber-700 font-light mb-6"
             />
-            <div className="flex flex-wrap gap-6 text-amber-800">
-              <span className="border-r border-amber-300 pr-6">
+          <div className="flex flex-wrap gap-6 text-amber-800">
+            <span className="border-r border-amber-300 pr-6">
                 <EditableText tag="span" text={cvData.personalInfo.email} isEditing={isEditing} />
-              </span>
-              <span className="border-r border-amber-300 pr-6">
+            </span>
+            <span className="border-r border-amber-300 pr-6">
                 <EditableText tag="span" text={cvData.personalInfo.phone} isEditing={isEditing} />
               </span>
               <span>
@@ -267,34 +267,34 @@ export default function ElegantCV() {
                   text={`${cvData.personalInfo.address}, ${cvData.personalInfo.city}, ${cvData.personalInfo.country}`} 
                   isEditing={isEditing} 
                 />
-              </span>
-            </div>
-          </header>
+            </span>
+          </div>
+        </header>
 
-          <div className="p-10">
-            {/* Summary */}
-            <section className="mb-8">
-              <h2 className="text-3xl font-serif text-amber-900 mb-4 border-b-2 border-amber-200 pb-2">
-                Professional Summary
-              </h2>
+        <div className="p-10">
+          {/* Summary */}
+          <section className="mb-8">
+            <h2 className="text-3xl font-serif text-amber-900 mb-4 border-b-2 border-amber-200 pb-2">
+              Professional Summary
+            </h2>
               <EditableText
                 tag="p"
                 text={cvData.profile}
                 isEditing={isEditing}
                 className="text-gray-700 leading-relaxed text-lg"
               />
-            </section>
+          </section>
 
-            {/* Experience */}
-            <section className="mb-8">
-              <h2 className="text-3xl font-serif text-amber-900 mb-4 border-b-2 border-amber-200 pb-2">
-                Professional Experience
-              </h2>
-              <div className="space-y-6">
-                {cvData.experience.map((exp, idx) => (
-                  <div key={idx} className="pl-4 border-l-4 border-amber-300">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
+          {/* Experience */}
+          <section className="mb-8">
+            <h2 className="text-3xl font-serif text-amber-900 mb-4 border-b-2 border-amber-200 pb-2">
+              Professional Experience
+            </h2>
+            <div className="space-y-6">
+              {cvData.experience.map((exp, idx) => (
+                <div key={idx} className="pl-4 border-l-4 border-amber-300">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
                         <EditableText
                           tag="h3"
                           text={exp.position}
@@ -320,29 +320,29 @@ export default function ElegantCV() {
                         isEditing={isEditing}
                         className="text-amber-700 font-light"
                       />
-                    </div>
-                    <ul className="list-none text-gray-700 space-y-2 mt-3">
-                      {exp.description.map((item, i) => (
-                        <li key={i} className="flex items-start">
-                          <span className="mr-3 text-amber-600">▸</span>
-                          <EditableText tag="span" text={item} isEditing={isEditing} />
-                        </li>
-                      ))}
-                    </ul>
                   </div>
-                ))}
-              </div>
-            </section>
+                  <ul className="list-none text-gray-700 space-y-2 mt-3">
+                    {exp.description.map((item, i) => (
+                      <li key={i} className="flex items-start">
+                        <span className="mr-3 text-amber-600">▸</span>
+                          <EditableText tag="span" text={item} isEditing={isEditing} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
 
-            {/* Two Column Layout */}
-            <div className="grid grid-cols-2 gap-8">
-              {/* Education */}
-              <section>
-                <h2 className="text-3xl font-serif text-amber-900 mb-4 border-b-2 border-amber-200 pb-2">
-                  Education
-                </h2>
-                {cvData.education.map((edu, idx) => (
-                  <div key={idx} className="mb-4">
+          {/* Two Column Layout */}
+          <div className="grid grid-cols-2 gap-8">
+            {/* Education */}
+            <section>
+              <h2 className="text-3xl font-serif text-amber-900 mb-4 border-b-2 border-amber-200 pb-2">
+                Education
+              </h2>
+              {cvData.education.map((edu, idx) => (
+                <div key={idx} className="mb-4">
                     <EditableText
                       tag="h3"
                       text={`${edu.degree}, ${edu.institution}`}
@@ -361,25 +361,25 @@ export default function ElegantCV() {
                       isEditing={isEditing}
                       className="text-amber-600 text-sm"
                     />
-                  </div>
-                ))}
-              </section>
-
-              {/* Skills */}
-              <section>
-                <h2 className="text-3xl font-serif text-amber-900 mb-4 border-b-2 border-amber-200 pb-2">
-                  Skills
-                </h2>
-                <div className="space-y-4">
-                  {cvData.skills.map((skill, idx) => (
-                    <SkillBar key={idx} label={skill.label} level={skill.level} isEditing={isEditing} />
-                  ))}
                 </div>
-              </section>
-            </div>
+              ))}
+            </section>
+
+            {/* Skills */}
+            <section>
+              <h2 className="text-3xl font-serif text-amber-900 mb-4 border-b-2 border-amber-200 pb-2">
+                Skills
+              </h2>
+              <div className="space-y-4">
+                {cvData.skills.map((skill, idx) => (
+                    <SkillBar key={idx} label={skill.label} level={skill.level} isEditing={isEditing} />
+                ))}
+              </div>
+            </section>
           </div>
         </div>
       </div>
+    </div>
     </>
   );
 }

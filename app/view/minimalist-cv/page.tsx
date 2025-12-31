@@ -182,7 +182,7 @@ export default function MinimalistCV() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-white py-16 px-4">
+    <div className="min-h-screen bg-white py-16 px-4">
         {/* Floating Action Button */}
         <div className="fab-container">
           <div className="fab-group">
@@ -213,30 +213,30 @@ export default function MinimalistCV() {
         </div>
 
         <div ref={resumeRef} className="max-w-2xl mx-auto">
-          {/* Minimalist Header */}
-          <header className="mb-12 text-center">
+        {/* Minimalist Header */}
+        <header className="mb-12 text-center">
             <EditableText
               tag="h1"
               text={cvData.personalInfo.name.toUpperCase()}
               isEditing={isEditing}
               className="text-4xl font-light text-gray-900 mb-3 tracking-widest"
             />
-            <div className="w-16 h-px bg-gray-400 mx-auto mb-4"></div>
+          <div className="w-16 h-px bg-gray-400 mx-auto mb-4"></div>
             <EditableText
               tag="p"
               text={cvData.personalInfo.title}
               isEditing={isEditing}
               className="text-sm text-gray-500 mb-6"
             />
-            <div className="flex justify-center gap-6 text-xs text-gray-400">
+          <div className="flex justify-center gap-6 text-xs text-gray-400">
               <span>
                 <EditableText tag="span" text={cvData.personalInfo.email} isEditing={isEditing} />
               </span>
-              <span>•</span>
+            <span>•</span>
               <span>
                 <EditableText tag="span" text={cvData.personalInfo.phone} isEditing={isEditing} />
               </span>
-              <span>•</span>
+            <span>•</span>
               <span>
                 <EditableText 
                   tag="span" 
@@ -244,28 +244,28 @@ export default function MinimalistCV() {
                   isEditing={isEditing} 
                 />
               </span>
-            </div>
-          </header>
+          </div>
+        </header>
 
-          {/* Summary */}
-          <section className="mb-12">
+        {/* Summary */}
+        <section className="mb-12">
             <EditableText
               tag="p"
               text={cvData.profile}
               isEditing={isEditing}
               className="text-gray-600 leading-relaxed text-center"
             />
-          </section>
+        </section>
 
-          {/* Experience */}
-          <section className="mb-12">
-            <h2 className="text-xs font-light text-gray-400 uppercase tracking-widest mb-8 text-center">
-              Experience
-            </h2>
-            <div className="space-y-10">
-              {cvData.experience.map((exp, idx) => (
-                <div key={idx} className="text-center">
-                  <div className="mb-3">
+        {/* Experience */}
+        <section className="mb-12">
+          <h2 className="text-xs font-light text-gray-400 uppercase tracking-widest mb-8 text-center">
+            Experience
+          </h2>
+          <div className="space-y-10">
+            {cvData.experience.map((exp, idx) => (
+              <div key={idx} className="text-center">
+                <div className="mb-3">
                     <EditableText
                       tag="h3"
                       text={exp.position}
@@ -284,26 +284,26 @@ export default function MinimalistCV() {
                       isEditing={isEditing}
                       className="text-xs text-gray-400 mt-1"
                     />
-                  </div>
-                  <ul className="list-none text-gray-600 space-y-2 text-sm max-w-md mx-auto">
-                    {exp.description.map((item, i) => (
+                </div>
+                <ul className="list-none text-gray-600 space-y-2 text-sm max-w-md mx-auto">
+                  {exp.description.map((item, i) => (
                       <li key={i}>
                         <EditableText tag="span" text={item} isEditing={isEditing} />
                       </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </section>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
 
-          {/* Education */}
-          <section className="mb-12 text-center">
-            <h2 className="text-xs font-light text-gray-400 uppercase tracking-widest mb-8">
-              Education
-            </h2>
-            {cvData.education.map((edu, idx) => (
-              <div key={idx} className="mb-4">
+        {/* Education */}
+        <section className="mb-12 text-center">
+          <h2 className="text-xs font-light text-gray-400 uppercase tracking-widest mb-8">
+            Education
+          </h2>
+          {cvData.education.map((edu, idx) => (
+            <div key={idx} className="mb-4">
                 <EditableText
                   tag="h3"
                   text={`${edu.degree}, ${edu.institution}`}
@@ -322,18 +322,18 @@ export default function MinimalistCV() {
                   isEditing={isEditing}
                   className="text-xs text-gray-400"
                 />
-              </div>
-            ))}
-          </section>
+            </div>
+          ))}
+        </section>
 
-          {/* Skills */}
-          <section className="text-center">
-            <h2 className="text-xs font-light text-gray-400 uppercase tracking-widest mb-8">
-              Skills
-            </h2>
-            <div className="space-y-4">
-              {cvData.skills.map((skill, idx) => (
-                <div key={idx}>
+        {/* Skills */}
+        <section className="text-center">
+          <h2 className="text-xs font-light text-gray-400 uppercase tracking-widest mb-8">
+            Skills
+          </h2>
+          <div className="space-y-4">
+            {cvData.skills.map((skill, idx) => (
+              <div key={idx}>
                   <EditableText
                     tag="p"
                     text={skill.label}
@@ -346,12 +346,12 @@ export default function MinimalistCV() {
                       style={{ width: `${Math.max(0, Math.min(100, skill.level))}%` }}
                     ></div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
+    </div>
     </>
   );
 }
