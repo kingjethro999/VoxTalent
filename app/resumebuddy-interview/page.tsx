@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Mic, Pause } from "lucide-react"
@@ -28,24 +28,49 @@ export default function ResumeBuddyInterviewPage() {
   // Interview state
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [conversationHistory, setConversationHistory] = useState<Array<{ question: string; answer: string }>>([])
+  
+  // Answer State (Immediate and accumulated)
   const [currentAnswer, setCurrentAnswer] = useState("")
   
-  // Audio
+  // Audio & Recognition Refs
   const [isPlaying, setIsPlaying] = useState(false)
   const [isListening, setIsListening] = useState(false)
+  
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const recognitionRef = useRef<any>(null)
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const currentAnswerRef = useRef<string>("")
+  const isSubmittingRef = useRef(false) // Prevents double submissions
+  const currentAnswerRef = useRef("") // Ref to access latest answer in callbacks
+  const isRequestingRef = useRef<boolean>(false) // Guard against multiple simultaneous TTS requests
 
   // Generate questions on mount
   useEffect(() => {
     generateQuestions()
   }, [])
 
+  // ----------------------------------------------------------------------
+  // CORE FIX: Silence Detection using useEffect
+  // This replaces the manual "checkTextUpdate" loop that was getting stuck.
+  // ----------------------------------------------------------------------
+  useEffect(() => {
+    // Only run if we are actively listening and have some text
+    if (!isListening || currentAnswer.trim().length === 0) return
+
+    // Set a timer to submit after 3 seconds of no text updates
+    const timer = setTimeout(() => {
+      console.log("[ResumeBuddy] Silence detected (3s). Auto-submitting...")
+      submitAnswer()
+    }, 3000)
+
+    // Cleanup: If 'currentAnswer' changes (user speaks), this clears the old timer
+    // and starts a fresh 3s timer.
+    return () => clearTimeout(timer)
+  }, [currentAnswer, isListening])
+
+
   const generateQuestions = async () => {
     setState("generating")
     try {
+      // NOTE: Ensure this matches your actual API route path
       const response = await fetch("/api/gemini/generate-resume-questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -59,10 +84,6 @@ export default function ResumeBuddyInterviewPage() {
 
       setQuestions(result.questions)
       setState("ready")
-      // Auto-start first question after a brief delay
-      setTimeout(() => {
-        askQuestion(result.questions[0])
-      }, 1000)
     } catch (err) {
       console.error("Error generating questions:", err)
       setError(err as Error)
@@ -71,24 +92,25 @@ export default function ResumeBuddyInterviewPage() {
   }
 
   const askQuestion = async (question: Question) => {
+    // Prevent multiple simultaneous requests
+    if (isRequestingRef.current) {
+      console.log("[ResumeBuddy] TTS request already in progress, skipping")
+      return
+    }
+
     setState("asking")
-    setCurrentAnswer("")
     setIsListening(false)
+    setCurrentAnswer("")
+    currentAnswerRef.current = ""
+    isSubmittingRef.current = false
 
-    // Stop any existing audio
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current = null
-    }
+    // Cleanup previous audio/recognition
+    if (audioRef.current) audioRef.current.pause()
+    if (recognitionRef.current) recognitionRef.current.stop()
 
-    // Stop any existing recognition
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-      recognitionRef.current = null
-    }
+    isRequestingRef.current = true
 
     try {
-      // Get TTS audio - use ONLY the question text
       const response = await fetch("/api/elevenlabs/text-to-speech", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,86 +119,65 @@ export default function ResumeBuddyInterviewPage() {
 
       const result = await response.json()
       if (!result.success) {
-        throw new Error(result.error || "Failed to generate speech")
+        // Don't retry on API errors - just proceed to listening
+        console.error("[ResumeBuddy] TTS API error:", result.error)
+        isRequestingRef.current = false
+        startListening()
+        return
       }
 
-      // Play audio
       const audio = new Audio(`data:audio/mp3;base64,${result.audio}`)
-      
-      // Clean up previous audio
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current.src = ""
-      }
-      
       audioRef.current = audio
       
       audio.onplay = () => setIsPlaying(true)
       audio.onended = () => {
         setIsPlaying(false)
-        // Wait 5-8 seconds, then auto-start listening
-        const delay = 5000 + Math.random() * 3000 // 5-8 seconds
-        setTimeout(() => {
-          startListening()
-        }, delay)
+        isRequestingRef.current = false
+        // Give a small breathing room before listening
+        setTimeout(() => startListening(), 500)
       }
       
-      audio.onerror = (err) => {
-        console.error("Audio playback error:", err)
+      // Fallback if audio fails to play
+      audio.onerror = () => {
+        console.warn("Audio playback failed, starting listening anyway")
         setIsPlaying(false)
-        setState("ready")
+        isRequestingRef.current = false
+        startListening()
       }
       
       await audio.play()
     } catch (err) {
       console.error("Error asking question:", err)
-      setError(err as Error)
-      setState("error")
+      isRequestingRef.current = false
+      // If TTS fails, just move to listening state so user can still answer
+      startListening() 
     }
   }
 
-  const startListening = async () => {
-    // Stop any existing recognition first
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-      recognitionRef.current = null
-    }
-
-    // Clear any existing silence timer
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current)
-      silenceTimerRef.current = null
-    }
-
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-      alert("Speech recognition not supported in this browser. Please use Chrome or Edge.")
-      return
-    }
-
-    // Request microphone permission
-    try {
-      await navigator.mediaDevices.getUserMedia({ audio: true })
-    } catch (err) {
-      alert("Microphone permission denied. Please allow microphone access and try again.")
-      return
-    }
-
-    setState("listening")
-    setIsListening(true)
+  const startListening = useCallback(async () => {
+    if (recognitionRef.current) recognitionRef.current.stop()
 
     const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition
+    if (!SpeechRecognition) {
+      alert("Speech recognition not supported. Please use Chrome.")
+      return
+    }
+
     const recognition = new SpeechRecognition()
     recognition.continuous = true
     recognition.interimResults = true
     recognition.lang = "en-US"
 
-    let finalTranscript = ""
+    recognition.onstart = () => {
+      setIsListening(true)
+      setState("listening")
+    }
 
     recognition.onresult = (event: any) => {
+      let finalTranscript = ""
       let interimTranscript = ""
-      finalTranscript = ""
 
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      for (let i = 0; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript
         if (event.results[i].isFinal) {
           finalTranscript += transcript + " "
@@ -185,124 +186,110 @@ export default function ResumeBuddyInterviewPage() {
         }
       }
 
-      // Update with both final and interim results
-      const fullTranscript = finalTranscript + interimTranscript
-      setCurrentAnswer(fullTranscript)
-      currentAnswerRef.current = fullTranscript
+      // Combine what we had before (if needed) with new input
+      // Ideally, for continuous=true, we just take the full event stream
+      // But to be safe, we just use what the event gives us cleanly
       
-      // Clear existing timer
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current)
-        silenceTimerRef.current = null
-      }
+      const fullText = (finalTranscript + interimTranscript).replace(/\s+/g, ' ')
       
-      // If we have a final transcript (user finished speaking), wait for silence
-      if (finalTranscript.trim().length > 0) {
-        // Wait 3 seconds of silence after final speech, then auto-submit
-        silenceTimerRef.current = setTimeout(() => {
-          // Check if we're still listening and have an answer
-          const answerToSubmit = currentAnswerRef.current.trim()
-          if (answerToSubmit.length > 0 && isListening && recognitionRef.current) {
-            console.log("[ResumeBuddy] Auto-submitting after 3 seconds of silence")
-            // Stop recognition first
-            recognitionRef.current.stop()
-            recognitionRef.current = null
-            setIsListening(false)
-            // Ensure answer is set, then submit
-            setCurrentAnswer(answerToSubmit)
-            setTimeout(() => {
-              submitAnswer()
-            }, 200)
-          }
-        }, 3000)
+      // Update state (triggers the useEffect timer)
+      if (fullText.trim()) {
+        setCurrentAnswer(prev => {
+            // Simple logic: if the new text is longer or different, update
+            // For simple "continuous" usage, usually accumulating is safer
+            // but here we just want the latest snapshot.
+            return fullText
+        })
+        currentAnswerRef.current = fullText
       }
     }
 
     recognition.onend = () => {
-      // Only restart if we're still in listening state and haven't submitted
-      if (isListening && state === "listening" && currentAnswer.trim().length === 0) {
-        // Restart recognition if it ended unexpectedly (no answer yet)
-        try {
-          recognition.start()
-        } catch (err) {
-          console.log("Recognition already started or stopped")
-          setIsListening(false)
-          setState("ready")
+        // FAILSAFE: If recognition stops...
+        if (isSubmittingRef.current) return // We stopped it intentionally
+
+        // If we have an answer, assume the user finished speaking and the browser cut it off
+        if (currentAnswerRef.current.trim().length > 0) {
+            console.log("[ResumeBuddy] Recognition ended with text. Submitting.")
+            submitAnswer()
+        } else {
+            // No text? Probably noise or permissions. Restart listening.
+            if (state === "listening") {
+                console.log("[ResumeBuddy] Recognition restarted (empty input)")
+                try {
+                    recognition.start()
+                } catch (e) { /* ignore start errors */ }
+            }
         }
-      } else {
-        setIsListening(false)
-        if (state === "listening") {
-          setState("ready")
-        }
-      }
     }
 
     recognition.onerror = (event: any) => {
-      console.error("Speech recognition error:", event.error)
+      console.error("Speech error:", event.error)
       
-      if (event.error === "no-speech") {
+      if (event.error === 'network') {
+        // Option A: Auto-retry after a short delay (e.g. 1 second)
+        setTimeout(() => {
+           try {
+             if (state === 'listening') recognition.start();
+           } catch(e) {}
+        }, 1000);
+        
+        // Option B: Show a user-friendly toast/alert
+        // toast.error("Network issue detected. Please check your internet connection.");
+      } else if (event.error === 'not-allowed') {
         setIsListening(false)
-        setState("ready")
-        recognitionRef.current = null
-      } else if (event.error === "aborted") {
-        setIsListening(false)
-        setState("ready")
-        recognitionRef.current = null
-      } else if (event.error === "not-allowed") {
-        alert("Microphone permission denied. Please allow microphone access.")
-        setIsListening(false)
-        setState("ready")
-        recognitionRef.current = null
-      } else {
-        setIsListening(false)
-        setState("ready")
-        recognitionRef.current = null
+        alert("Microphone access denied.")
       }
     }
 
     recognitionRef.current = recognition
-    
     try {
-      recognition.start()
-    } catch (err) {
-      console.error("Failed to start recognition:", err)
-      setIsListening(false)
-      setState("ready")
+        recognition.start()
+    } catch(e) {
+        console.error("Failed to start recognition", e)
     }
-  }
+  }, [state]) // Depend on state to know if we should restart
 
   const submitAnswer = async () => {
-    if (!currentAnswer.trim()) return
+    // Prevent double submission
+    if (isSubmittingRef.current) return
+    isSubmittingRef.current = true
 
-    // Stop listening and clear timers
+    // Stop listening immediately
     if (recognitionRef.current) {
-      recognitionRef.current.stop()
-      recognitionRef.current = null
-    }
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current)
-      silenceTimerRef.current = null
+        recognitionRef.current.stop() 
     }
     setIsListening(false)
 
-    const currentQuestion = questions[currentQuestionIndex]
-    
-    // Add to conversation history
+    // Capture the answer
+    const answerToSubmit = currentAnswerRef.current.trim()
+    if (!answerToSubmit) {
+        // If empty, just restart listening (user was silent too long)
+        isSubmittingRef.current = false
+        startListening()
+        return
+    }
+
+    console.log("Submitting:", answerToSubmit)
+
+    // Update History
+    const currentQ = questions[currentQuestionIndex]
     const newHistory = [...conversationHistory, {
-      question: currentQuestion.question,
-      answer: currentAnswer,
+        question: currentQ.question,
+        answer: answerToSubmit
     }]
     setConversationHistory(newHistory)
 
-    // Move to next question or complete
+    // Proceed
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1)
-      setTimeout(() => {
-        askQuestion(questions[currentQuestionIndex + 1])
-      }, 1000)
+        const nextIndex = currentQuestionIndex + 1
+        setCurrentQuestionIndex(nextIndex)
+        // Small delay to let UI settle
+        setTimeout(() => {
+            askQuestion(questions[nextIndex])
+        }, 500)
     } else {
-      // All questions answered - process transcript
-      processTranscript(newHistory)
+        processTranscript(newHistory)
     }
   }
 
@@ -311,113 +298,65 @@ export default function ResumeBuddyInterviewPage() {
     setLoadingStep(0)
 
     try {
-      // Step 0: Calibrating data
-      console.log("[ResumeBuddy] Step 0: Calibrating data...")
-      setLoadingStep(0)
-
-      // Create transcript from conversation history
-      const transcript = history.map(item => 
-        `Q: ${item.question}\nA: ${item.answer}`
-      ).join("\n\n")
-
-      console.log("[ResumeBuddy] Transcript created, length:", transcript.length)
+      const transcript = history.map(item => `Q: ${item.question}\nA: ${item.answer}`).join("\n\n")
       
-      // Step 1: Structuring resume
-      console.log("[ResumeBuddy] Step 1: Structuring resume...")
-      setLoadingStep(1)
-
+      setLoadingStep(1) // Structuring
       const response = await fetch("/api/gemini/process-transcript", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transcript }),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to process transcript")
-      }
-
-      // Step 2: Optimizing ATS
-      console.log("[ResumeBuddy] Step 2: Optimizing ATS...")
-      setLoadingStep(2)
-      
+      if (!response.ok) throw new Error("Failed to process transcript")
       const result = await response.json()
 
-      if (!result.success) {
-        throw new Error("Invalid response from Gemini API")
-      }
-
-      console.log("[ResumeBuddy] Received data from Gemini")
-
-      // Update CV data
+      setLoadingStep(2) // Optimizing
       if (result.data) {
         updateCvData(result.data)
-        console.log("[ResumeBuddy] CV data updated in data.tsx")
       }
 
-      // Step 3: Preparing preview
-      console.log("[ResumeBuddy] Step 3: Preparing preview...")
-      setLoadingStep(3)
-
-      // Navigate to template selection
-      setTimeout(() => {
-        router.push("/cv-select")
-      }, 1500)
+      setLoadingStep(3) // Preview
+      setTimeout(() => router.push("/cv-select"), 1500)
     } catch (err) {
-      console.error("[ResumeBuddy] Error processing transcript:", err)
+      console.error(err)
       setError(err as Error)
       setState("error")
     }
   }
 
+  // --- RENDER HELPERS ---
+
   if (state === "error" && error) {
     return (
       <div className="min-h-screen bg-black text-white">
-        <nav className="fixed top-0 left-0 right-0 h-[70px] flex items-center justify-between px-10 z-50 bg-black/70 backdrop-blur-lg border-b border-white/5">
-          <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-            VoxTalent
-          </Link>
-        </nav>
-        <main className="pt-[90px] min-h-screen flex items-center justify-center px-4">
-          <ErrorState
-            title="Resume Building Error"
-            message={error.message}
-            onRetry={() => router.push("/")}
-            retryLabel="Go Home"
-          />
-        </main>
+        <ErrorState title="Error" message={error.message} onRetry={() => window.location.reload()} />
       </div>
     )
   }
 
-  if (state === "loading" || state === "generating" || state === "processing") {
-    const messages = state === "generating" 
-      ? ["Preparing your interview", "Generating questions"]
-      : state === "processing"
-      ? ["Calibrating data", "Structuring resume", "Optimizing ATS", "Preparing preview"]
-      : ["Loading..."]
-    
+  if (["loading", "generating", "processing"].includes(state)) {
     return (
-      <div className="min-h-screen bg-black text-white">
-        <nav className="fixed top-0 left-0 right-0 h-[70px] flex items-center justify-between px-10 z-50 bg-black/70 backdrop-blur-lg border-b border-white/5">
-          <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-            VoxTalent
-          </Link>
-        </nav>
-        <main className="pt-[90px] min-h-screen flex items-center justify-center px-4">
-          <LoadingTransition
-            messages={messages}
-            currentStep={loadingStep}
-          />
-        </main>
+      <div className="min-h-screen bg-black text-white pt-[90px] flex justify-center">
+        <LoadingTransition messages={["Preparing...", "Analyzing...", "Finalizing..."]} currentStep={loadingStep} />
+      </div>
+    )
+  }
+
+  if (state === "ready" && currentQuestionIndex === 0) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center">
+        <h1 className="text-3xl font-bold mb-4">Ready to Start</h1>
+        <button 
+            onClick={() => askQuestion(questions[0])}
+            className="px-8 py-4 bg-white text-black rounded-lg font-bold hover:bg-gray-200"
+        >
+            Start Interview
+        </button>
       </div>
     )
   }
 
   const currentQuestion = questions[currentQuestionIndex]
-  const progress = ((currentQuestionIndex + 1) / questions.length) * 100
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -436,7 +375,7 @@ export default function ResumeBuddyInterviewPage() {
           <div className="h-2 bg-white/10 rounded-full overflow-hidden">
             <div
               className="h-full bg-white transition-all duration-500"
-              style={{ width: `${progress}%` }}
+              style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
             />
           </div>
         </div>
@@ -450,48 +389,31 @@ export default function ResumeBuddyInterviewPage() {
           </div>
           <h2 className="text-2xl font-semibold mb-6">{currentQuestion?.question}</h2>
 
-          {/* Audio Controls */}
-          {state === "asking" && isPlaying && (
-            <div className="flex items-center gap-4 text-white/60 mb-4">
-              <Pause className="h-5 w-5" />
-              <span>Asking question...</span>
-            </div>
+          {/* Status Indicator */}
+          {state === "asking" && (
+             <div className="flex items-center gap-2 text-yellow-400 mb-4">
+               <Pause className="h-4 w-4" /> <span>Asking...</span>
+             </div>
           )}
-          
           {state === "listening" && (
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex items-center gap-2 text-green-400">
-                <Mic className="h-5 w-5 animate-pulse" />
-                <span className="text-sm font-semibold">Listening... Speak your answer</span>
-              </div>
+            <div className="flex items-center gap-2 text-green-400 mb-4">
+                <Mic className="h-4 w-4 animate-pulse" /> 
+                <span>Listening... (Auto-submits after 3s silence)</span>
             </div>
           )}
 
-          {/* Answer Display (Read-only, voice-only input) */}
-          {(state === "ready" || state === "listening") && (
-            <div className="space-y-4">
-              <div className="w-full p-4 bg-white/5 border border-white/10 rounded-lg text-white min-h-[150px]">
-                {currentAnswer ? (
-                  <p className="text-white whitespace-pre-wrap">{currentAnswer}</p>
-                ) : (
-                  <p className="text-white/40 italic">
-                    {state === "listening" 
-                      ? "Listening for your answer..." 
-                      : "Waiting for question to finish..."}
-                  </p>
-                )}
-              </div>
-              
-              {state === "listening" && currentAnswer.trim() && (
-                <div className="text-xs text-white/50">
-                  Speak naturally. Your answer will be submitted automatically after a few seconds of silence.
-                </div>
-              )}
-            </div>
-          )}
+          {/* Answer Display */}
+          <div className="w-full p-4 bg-white/5 border border-white/10 rounded-lg text-white min-h-[150px]">
+            {currentAnswer ? (
+                <p className="whitespace-pre-wrap">{currentAnswer}</p>
+            ) : (
+                <p className="text-white/30 italic">
+                    {state === "asking" ? "Listen to the question..." : "Speak your answer..."}
+                </p>
+            )}
+          </div>
         </div>
       </main>
     </div>
   )
 }
-
